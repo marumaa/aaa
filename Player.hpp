@@ -143,28 +143,46 @@ struct Player {
         long ptrLong = base + OFF_GLOW_HIGHLIGHT_ID;
         mem::Write<int>(ptrLong, glowEnable);
     }
-    void setCustomGlow(int health, bool isVisible, bool isSameTeam)
-    {
-        static const int contextId = 0; // Same as glow enable
-        long basePointer = base;
-        int settingIndex = 63;
-        std::array<unsigned char, 4> highlightFunctionBits = {
-            139,   // InsideFunction
-            80, // OutlineFunction: HIGHLIGHT_OUTLINE_OBJECTIVE
-            32,  // OutlineRadius: size * 255 / 8
-            64   // (EntityVisible << 6) | State & 0x3F | (AfterPostProcess << 7)
-        };
-        std::array<float, 3> glowColorRGB = { 1, 1, 0 };
+void setCustomGlow(int health, bool isVisible, bool isSameTeam)
+{
+    static const int contextId = 0; // Same as glow enable
+    long basePointer = base;
+    int settingIndex = 63;
 
-        if (!isSameTeam) {
-            mem::Write<unsigned char>(basePointer + OFF_GLOW_HIGHLIGHT_ID + contextId, settingIndex);
-            mem::Write<typeof(highlightFunctionBits)>(
-                lp->highlightSettingsPtr + HIGHLIGHT_TYPE_SIZE * settingIndex + 0, highlightFunctionBits);
-            mem::Write<typeof(glowColorRGB)>(
-                lp->highlightSettingsPtr + HIGHLIGHT_TYPE_SIZE * settingIndex + 4, glowColorRGB);
-            mem::Write<int>(basePointer + OFF_GLOW_FIX, 2);
-        }   
+    std::array<unsigned char, 4> highlightFunctionBits = {
+        139, // InsideFunction
+        80,  // OutlineFunction: HIGHLIGHT_OUTLINE_OBJECTIVE
+        32,  // OutlineRadius: size * 255 / 8
+        64   // (EntityVisible << 6) | State & 0x3F | (AfterPostProcess << 7)
+    };
+
+    // Visible/Invisibleに応じたglowの色を設定
+    std::array<float, 3> glowColorRGB;
+    if (isVisible) {
+        glowColorRGB = { 0.91, 0.26, 0.68 }; // Visibleの時の色
+    } else {
+        glowColorRGB = { 0.0, 0.0, 1.0 };    // Invisibleの時の色（青）
     }
+
+    if (!isSameTeam) {
+        // highlightFunctionBitsおよびglowColorRGBの設定をMemoryに書き込み
+        mem::Write<unsigned char>(basePointer + OFF_GLOW_HIGHLIGHT_ID + contextId, settingIndex);
+        
+        // 第2引数として説明用の文字列を追加
+        long highlightSettingsPtr = mem::Read<long>(OFF_REGION + OFF_GLOW_HIGHLIGHTS, "Read Highlight Settings");
+        
+        mem::Write<std::array<unsigned char, 4>>(highlightSettingsPtr + HIGHLIGHT_TYPE_SIZE * settingIndex + 0, highlightFunctionBits);
+        mem::Write<std::array<float, 3>>(highlightSettingsPtr + HIGHLIGHT_TYPE_SIZE * settingIndex + 4, glowColorRGB);
+
+        // その他のGlow設定
+        mem::Write<int>(basePointer + OFF_GLOW_FIX, 0);
+        mem::Write<int>(basePointer + 0x264, 1000);  // 距離（DISTANCE）を設定
+    }
+}
+
+
+
+
     float getLastVisibleTime()
     {
         long ptrLong = base + OFF_LAST_VISIBLE_TIME;
